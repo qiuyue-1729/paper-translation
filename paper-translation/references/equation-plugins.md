@@ -1,39 +1,32 @@
-# AxMath 与 MathType 公式接入
+# AxMath 与 MathType 调用
 
-## 调用原则
+## 已实现的入口
 
-（1）先发现本机安装版本、Word 加载项、OLE 注册信息、SDK 文档和运行库。优先 AxMath；不可用时使用 MathType。已有公式沿用原插件格式，除非用户另有要求。机器路径需动态发现，不硬编码作者计算机的安装位置。
+（1）使用 [转换脚本](../scripts/convert-equations.ps1) 通过 Word COM 调用本机插件。AxMath 使用 AMCCTex2AMEqn.ConvertTeX2AMEqn；MathType 使用 MTCommand_TeXToggle。入口从已安装插件随附的 Word 宏模板确认，脚本不包含厂商代码或二进制。
 
-（2）只有获得实际接口名称、函数签名、位数和返回值说明后才编写调用。插件 DLL、Word 模板或菜单存在不表示 API 调用已验证。不得根据 DLL 文件名猜测函数，也不得把网页渲染服务当作桌面 Word 可编辑对象接口。
+（2）需要 Windows、Word、可正常使用的 AxMath 或 MathType，以及 PowerShell 7。插件宏需已加载；可通过 AddinPath 指定本机安装附带的可信 Word 加载项。不得为运行而降低宏安全设置。优先 AxMath，不可用时切换 MathType 或 Word 原生公式。
 
-## AxMath
+## 调用方式
 
-（1）从程序安装信息和 Word STARTUP 目录定位 AxMath 与其 Word 模板，查阅安装附带帮助及厂商文档，确认公开宏、OLE 或自动化入口。
+```powershell
+pwsh -File scripts/convert-equations.ps1 -InputDocx staging.docx -OutputDocx converted.docx -Engine AxMath -ExpectedCount 4 -OutputPdf converted.pdf
+pwsh -File scripts/convert-equations.ps1 -InputDocx staging.docx -OutputDocx converted.docx -Engine MathType -ExpectedCount 4 -OutputPdf converted.pdf
+```
 
-（2）如找到可调用入口，建立任务本地桥接，将公式源转换并插入 Word，保存版本、调用方式及结果。仅有交互功能时明确交互依赖；没有可核实接口时使用 Word 原生公式，不宣称 AxMath 已自动接入。
+（1）输入使用包含模板样式的独立中间文档，公式各占一个段落，采用 $...$、$$...$$、\(...\) 或 \[...\] 定界。脚本从后向前逐公式转换，避免整篇混合字号影响插件字号。不要将已有公式对象的成品传入：MathType Toggle 为双向转换，重复调用可能把对象变回文本。正文行内简单变量直接使用 Word 上下标。
 
-（3）官方安装与帮助入口：https://www.axsoft.co/ ，https://www.axsoft.co/AxMath_Help.pdf 。需要安装时从厂商取得程序或使用用户提供的可信安装包，记录来源、版本和校验值。
+（2）正文使用模板的“正文”样式；独立公式使用已有“公式”样式，可用 EquationStyle 参数指定用户模板中的对应名称。转换后重新应用该样式并清除插件增加的段落直接格式。保留正文样式及行距，不再逐公式写死行距。默认字号继承模板；仅在用户明确要求时传入 FontSize。
 
-## MathType
+（3）输入和输出路径必须不同，输出必须尚不存在。脚本核对转换前后数量、OLE 类型和保存重开后的对象数量；失败输出只是诊断副本，不能作为交付。脚本仅覆盖主文档中的独立公式段落，不处理混合行内复杂公式、文本框、页眉页脚或已存在的图形对象。公式编号在转换后按模板添加，避免混入转换段落。
 
-（1）从安装信息、Word 加载项和本地 SDK 定位主程序及匹配版本的运行库、宏模板、OLE 接口。SDK 中涉及 MT6.dll 等历史文件名时仍需核对实际版本和进程位数，不把文件名当作兼容保证。
+（4）插件出现许可、宏被阻止或交互对话框时保留错误，解决实际环境问题后再处理；不要盲目重复调用。新模板缺少公式样式时根据用户要求补齐或映射，不能自动覆盖正文样式。
 
-（2）以该版本的 SDK 或宏文档为依据调用公式转换与对象插入，检查返回码及错误。官方命令行文档仅证明可以打开公式文件和偏好文件，不据此假定支持任意 LaTeX 批量生成 Word 对象。
+## 已取得的运行结果
 
-（3）官方入口：https://www.wiris.com/en/mathtype/ 。命令行说明：https://docs.wiris.com/en_US/mathtypes-command-line-options 。SDK 文档如迁移或失效，从厂商文档首页或本地安装资料查找，不凭空补造接口。
+2026-10-15 在 Word 与 AxMath 2.5、MathType 7.4.2 环境中，下标、分式、矩阵、多层上下标四类样例均已实际转换。生成的类型分别为 Equation.AxMath 和 Equation.DSMT4，保存重开后四个对象保持存在。另对保存对象执行反向 TeX 转换，四个对象均还原为有内容的公式，证明不是图片包装。已检查生成页面，并修正了混合字号与正文固定行距造成的问题；最终脚本改用模板“公式”样式。
 
-## 安装与打包
+这些结果证明所测版本和样例的调用可用，不保证任意 LaTeX 命令、其他版本或机器环境均兼容。每篇正式输出仍应核对公式语义和最终页面。
 
-（1）优先使用现有安装，不为翻译任务自动升级软件。需安装时按用户授权及当前环境权限处理。技能默认提供官方入口，不包含商业软件二进制或激活材料；只有许可允许再分发且用户要求时才随包保存安装程序。
+## 安装来源
 
-（2）安装包用于部署，不替代调用接口；不得仅复制 DLL 就声称可独立运行。不得将产品授权视为可由 skill 提供。
-
-## 可编辑性与视觉验证
-
-（1）实际接入时，在独立临时文档验证下标、分式、矩阵和多层上下标，确认由所选工具生成的对象保存重开后仍能编辑。存在预览图或 OLE 包装不足以证明可编辑。
-
-（2）渲染检查字符、上下标、基线、编号和分页，记录通过验证的程序版本、入口及适用范围。
-
-（3）接口失败时记录实际错误，使用 Word 原生公式并如实说明。清晰图片仅为无法可靠生成公式时的替代，不冒充插件对象。
-
-当前能力边界：本 skill 提供接入流程，不附带已验证的 AxMath 或 MathType 自动生成桥接脚本。每个执行环境必须完成真实接口验证后才能声称插件调用成功。
+优先使用本机安装，不为翻译任务自动升级。需要安装时使用官方入口或用户提供的可信安装程序，并按当次授权处理。AxMath：https://www.axsoft.co/ 。MathType：https://www.wiris.com/en/mathtype/ 。本 skill 不附带商业安装包或激活材料。
