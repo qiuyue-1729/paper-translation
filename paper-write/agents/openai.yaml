@@ -1,6 +1,6 @@
 interface:
   display_name: "论文全文翻译与关键内容提炼"
   short_description: "完整翻译各学科论文，保留公式与原图，按用户模板生成并逐页检查中文 Word"
-  default_prompt: "使用 $paper-doc 翻译我提供的论文，提炼关键内容，并按指定模板或默认模板生成中文 Word。"
+  default_prompt: "使用 $paper-write 翻译我提供的论文，提炼关键内容，并按指定模板或默认模板生成中文 Word。"
 policy:
   allow_implicit_invocation: true
